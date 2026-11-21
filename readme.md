@@ -164,13 +164,22 @@ openocd --version
 
 ## 5. Compilar y grabar
 
+### Clonar y compilar
 ```bash
-git clone [enlace del repositorio]
-cd [nombre de la carpeta]
-make            # compila y muestra el uso de memoria
-make flash      # graba main.elf en la placa con OpenOCD
-make clean      # borra los archivos compilados
+git clone https://github.com/maira-05/Proyecto_MPEI.git
+cd Proyecto_MPEI
+make
+make flash
 ```
+
+### Uso de memoria
+| Región | Usado | Total | % |
+|---|---|---|---|
+| Flash (`.text` + `.rodata` + `.data`) | 22 924 B | 512 KiB | 4,4 % |
+| RAM (`.data` + `.bss`) | 10 932 B | 96 KiB | 11,1 % |
+
+La mayor parte de la RAM es el doble buffer de audio (2 × 4096 B).
+La mayor parte de `.rodata` son los bitmaps de las fuentes.
 
 Al terminar, `make` muestra el tamaño de cada sección (`arm-none-eabi-size`).
 Valores de referencia: [.text = ... bytes, .rodata = ... bytes, .bss = ... bytes].
