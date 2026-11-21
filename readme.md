@@ -164,39 +164,70 @@ openocd --version
 
 ## 5. Compilar y grabar
 
+### Requisitos
+- `arm-none-eabi-gcc` (toolchain ARM)
+- `make`
+- `openocd`
+- En WSL: `usbipd-win` para pasar el ST-Link a Linux
+
 ### Clonar y compilar
 ```bash
 git clone https://github.com/maira-05/Proyecto_MPEI.git
 cd Proyecto_MPEI
 make
-make flash
 ```
 
-### Uso de memoria
-| Región | Usado | Total | % |
-|---|---|---|---|
-| Flash (`.text` + `.rodata` + `.data`) | 22 924 B | 512 KiB | 4,4 % |
-| RAM (`.data` + `.bss`) | 10 932 B | 96 KiB | 11,1 % |
-
-La mayor parte de la RAM es el doble buffer de audio (2 × 4096 B).
-La mayor parte de `.rodata` son los bitmaps de las fuentes.
-
-Al terminar, `make` muestra el tamaño de cada sección (`arm-none-eabi-size`).
-Valores de referencia: [.text = ... bytes, .rodata = ... bytes, .bss = ... bytes].
+### Grabar en la Nucleo
+En WSL, primero conectar el ST-Link desde PowerShell (como administrador):
+```powershell
+usbipd list
+usbipd bind --busid <BUSID>      # solo la primera vez
+usbipd attach --wsl --busid <BUSID>
+```
+Luego, en WSL:
+```bash
+make flash
+```
+Para borrar los archivos generados: `make clean`.
 
 ### Qué hace el Makefile
-
 - Compila todos los `.c` de la carpeta principal, `src/`, `source/` y `tft_fuentes/`,
   y el `crt0.S`, con `-mcpu=cortex-m4 -std=c11 -ffreestanding -Og -g`.
 - Busca encabezados en `inc/`, `inc/cmsis/`, `source/` y `tft_fuentes/`.
 - Enlaza con `linker_script.ld` y `-nostdlib`, agregando solo `libc` y `libgcc`.
+- Al terminar, muestra el tamaño de cada sección con `arm-none-eabi-size`.
 - `make flash` usa OpenOCD con `interface/stlink.cfg` y `target/stm32f4x.cfg`.
 
+### Uso de memoria
+| Región                                | Usado    | Total   | %      |
+|-------------------------------------- |--------- |-------- |------- |
+| Flash (`.text` + `.rodata` + `.data`) | 22 924 B | 512 KiB | 4,4 %  |
+| RAM (`.data` + `.bss`)                | 10 932 B | 96 KiB  | 11,1 % |
+
+- La mayor parte de la RAM es el doble buffer de audio (2 × 4096 B).
+- La mayor parte de `.rodata` son los bitmaps de las fuentes.
+- `.data` ocupa espacio en los dos lados: su valor inicial se guarda en Flash
+  y `crt0.S` lo copia a RAM al arrancar.
+
 ### Qué hace el linker script
+`linker_script.ld` define las dos memorias del STM32F401RE y dónde va cada sección:
 
-[Explicar: regiones FLASH y RAM, dónde quedan .text, .rodata, .data (en RAM, con su
-copia inicial en Flash), .bss y la pila, y los símbolos que usa crt0.S.]
+| Región | Inicio     | Tamaño  |
+|------- |------------|---------|
+| FLASH  | 0x08000000 | 512 KiB |
+| RAM    | 0x20000000 | 96 KiB  |
 
+- **`.text`** (Flash): primero la tabla de vectores (`.isr_vector`), que debe quedar en
+  0x08000000, y luego el código. `KEEP` evita que el enlazador la descarte.
+- **`.rodata`** (Flash): constantes y bitmaps de las fuentes.
+- **`.data`** (`> RAM AT> FLASH`): variables con valor inicial. Viven en RAM
+  (`_sdata`–`_edata`), pero su valor inicial se guarda en Flash (`_sidata`).
+- **`.bss`** (RAM, `NOLOAD`): variables en cero (`_sbss`–`_ebss`). No ocupa Flash.
+- **Pila**: empieza en `_estack` = 0x20018000 (final de la RAM) y crece hacia abajo.
+  Un `ASSERT` hace fallar el enlace si quedan menos de 2 KiB libres para ella.
+
+Al arrancar, `crt0.S` usa estos símbolos para copiar `.data` de Flash a RAM,
+poner `.bss` en cero y luego llamar a `main()`.
 ## 6. Preparar la microSD
 
 1. Formatear la microSD en **FAT32**.
@@ -252,16 +283,21 @@ cd pruebas/01_pines       # o la prueba que se quiera
 make
 make flash
 ```
+| Prueba                 | Qué comprueba                        | Si funciona                            |
+| ---------------------- | ------------------------------------ | -------------------------------------- |
+| `01_pines`             | Cableado de la pantalla, sin SPI     | Cada pin marca 3,3 V durante 2 s       |
+| `02_pantalla_parlante` | ST7789 en modo 0 (8 MHz) y audio PWM | Colores en pantalla y tonos 440–880 Hz |
+| `03_pantalla_modo3`    | ST7789 en modo 3 (1 MHz) y audio PWM | Igual que la 02 (esta sí funcionó)     |
+| `04_sd`                | Inicio de la SD, sector 0 y FAT32    | Verde; si falla, roja y LED parpadea   |
+| `05_sd_uart`           | Lo mismo que la 04, por UART         | Respuestas de cada comando (115200)    |
+| `06_audio_flash`       | PWM (TIM2) + TIM3 a 22 050 Hz        | Suena un fragmento guardado en Flash   |
 
-| Prueba                 | Qué comprueba                                           | Cómo se ve si funciona                                                    |
-| ---------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `01_pines`             | Cableado de la pantalla, sin SPI                        | Cada pin (CS, SCK, SDA, DC, RST) marca 3,3 V en el multímetro durante 2 s |
-| `02_pantalla_parlante` | SPI2 + ST7789 (modo 0, 8 MHz) y PWM + filtro + GF1002   | Pantalla roja, verde, azul y blanca; tonos de 440, 660 y 880 Hz           |
-| `03_pantalla_modo3`    | Lo mismo, con SPI en **modo 3** a 1 MHz                 | Igual que la 02 (con esta versión funcionó la pantalla)                   |
-| `04_sd`                | Inicio de la microSD, lectura del sector 0 y FAT32      | Pantalla verde; si falla, roja y el LED parpadea N veces (paso que falló) |
-| `05_sd_uart`           | Lo mismo que la 04, mostrando cada respuesta por UART   | Las respuestas de cada comando en el monitor serie (115200 baudios)       |
-| `06_audio_flash`       | DAC por PWM (TIM2) e interrupción de TIM3 a 22 050 Hz   | Suena un fragmento de canción guardado en la Flash                        |
+**Notas:**
 
+- **`01_pines`** pone en alto cada pin de la pantalla (CS, SCK, SDA, DC, RST) durante 2 s,
+  uno por uno, para medirlo con el multímetro.
+- **`02` y `03`** muestran rojo, verde, azul y blanco, y tocan 440, 660 y 880 Hz.
+- **`04_sd`**: si falla, el LED parpadea N veces, donde N es el paso que falló.
 **Notas:**
 
 - **`04_sd` y `05_sd_uart` usan el cableado de la primera versión:** la SD en PB3 (SCK),
@@ -280,7 +316,7 @@ En el proyecto final, el driver de la SD (`sd.c`) imprime por UART la respuesta 
 comando de inicio (CMD0, CMD8, ACMD41, CMD58), lo que sirve como modo de prueba del
 driver propio.
 
-## 9. Problemas comunes
+## 9. Problemas comunes 
 
 | Síntoma                        | Causa                          | Solución                                       |
 | ------------------------------ | ------------------------------ | ---------------------------------------------- |
