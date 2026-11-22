@@ -1,3 +1,5 @@
+/* IA: estructura con ??? y pistas de Claude; completado, comentado y probado por nosotros. */
+
 // pantalla.h encarga de dibujar en la pantalla, se llama desde el main 
 #ifndef __PANTALLA_H__
 #define __PANTALLA_H__

@@ -1,3 +1,5 @@
+/* IA: estructura con ??? y pistas de Claude; completado y probado por nosotros. */
+
 #include "audio.h"
 #include "gpio.h"
 #include "stm32f4xx.h"

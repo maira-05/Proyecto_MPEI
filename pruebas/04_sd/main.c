@@ -1,40 +1,18 @@
-/* =====================================================================
- * PRUEBA DE HARDWARE: modulo microSD (SPI1) + pantalla (SPI2)
- * NUCLEO-F401RE - registros directos con CMSIS, sin librerias.
+/*
+ * Prueba 04: microSD por SPI (CMD0, CMD8, ACMD41, CMD58, lectura del sector 0 y FAT32).
  *
- * OJO: solo verifica que la tarjeta y el modulo responden. NO lee el
- * sistema de archivos ni reproduce canciones: eso es el nucleo del
- * proyecto y lo escriben ustedes.
+ * IA: generado por Claude; compilado y probado por nosotros.
  *
- * Que hace:
- *   1. Inicializa la tarjeta en modo SPI (CMD0, CMD8, ACMD41, CMD58).
- *   2. Lee el sector 0 (CMD17) y revisa la firma 0x55AA.
- *   3. Revisa que la tarjeta este formateada en FAT32.
+ * RESULTADO: NO FUNCIONO. La pantalla se quedaba en azul ("cargando"): la SD nunca
+ * terminaba de iniciar. El modulo y la tarjeta se verificaron con un Arduino (ejemplo de
+ * la libreria SD de Arduino) y ahi si leyeron, asi que el fallo estaba del lado del STM32.
  *
- * Resultado en la pantalla:
- *   VERDE -> todo bien (tarjeta inicializada, sector 0 leido, FAT32)
- *   ROJO  -> algo fallo. El LED LD2 parpadea N veces (pausa) N veces...
- *            N = paso que fallo (ver tabla de codigos abajo)
- *   AZUL (al inicio) -> esta probando
- *
- * Codigos de error (parpadeos del LED):
- *   1 = CMD0 sin respuesta    -> cableado, alimentacion o tarjeta no insertada
- *   2 = CMD8 respuesta rara   -> tarjeta muy vieja (SD v1) o ruido
- *   3 = ACMD41 timeout        -> la tarjeta no termina de iniciar
- *   4 = CMD58 fallo
- *   5 = CMD17 no entrego datos (lectura del sector 0)
- *   6 = sector 0 sin firma 0x55AA -> tarjeta sin formato
- *   7 = no es FAT32           -> formatear en FAT32
- *
- * Conexiones:
- *   Modulo microSD (SIG0104):          Pantalla (igual que antes):
- *     VCC  -> 5V                         SCK -> PB13   SDA -> PB15
- *     GND  -> GND                        CS  -> PB12   DC  -> PB14
- *     SCK  -> PB3  (D3)                  RST -> PB1
- *     MISO -> PB4  (D5)                  VCC -> 3.3V   GND -> GND
- *     MOSI -> PB5  (D4)
- *     CS   -> PB6  (D10)
- * ===================================================================== */
+ * Usa el cableado viejo: SCK = PB3, MISO = PB4, MOSI = PB5.
+ * En el proyecto final se corrigio en sd.c y spi.c:
+ *   - La SD se movio a PA5-PA7 (PB3 tambien es la salida SWO de depuracion).
+ *   - Los pines del SPI1 pasaron a velocidad muy alta (con baja fallaba el ultimo bit).
+ *   - ACMD41 lleva la ventana de voltaje 2,7-3,6 V (0x00FF8000).
+ */
 
 #include <stdint.h>
 #include "stm32f4xx.h"

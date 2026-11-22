@@ -1,3 +1,5 @@
+/* IA: generado por Claude (adaptado del startup de ST); revisado, compilado y probado por nosotros. */
+
 ENTRY(Reset_Handler)
 
 MEMORY

@@ -10,8 +10,8 @@ con un DAC por PWM y muestra el nombre de la canción, el estado y un menú en u
 TFT ST7789 de 240×320. Se controla con cinco botones: Pause, Stop, Next, Prev y Menu.
 
 Todo el firmware está escrito **sin HAL, LL ni CubeMX**: los drivers de los periféricos
-son propios y trabajan directamente con los registros, y el arranque (`crt0.S`), el linker
-script y el Makefile también son propios. Se compila con la cadena GNU
+trabajan directamente con los registros, y el arranque (`crt0.S`), el linker script y el
+Makefile también se hicieron sin herramientas de ST (ver [USO_DE_IA.md](USO_DE_IA.md)). Se compila con la cadena GNU
 (`arm-none-eabi-gcc` y `make`) y se graba con OpenOCD.
 
 ---
@@ -22,7 +22,7 @@ script y el Makefile también son propios. Se compila con la cadena GNU
 2. [Materiales](#2-materiales)
 3. [Conexiones](#3-conexiones)
 4. [Instalar las herramientas](#4-instalar-las-herramientas)
-5. [Compilar y grabar](#5-compilar-y-grabar)
+5. [Compilación y programación de la placa](#5-compilación-y-programación-de-la-placa)
 6. [Preparar la microSD](#6-preparar-la-microsd)
 7. [Uso](#7-uso)
 8. [Pruebas por componente](#8-pruebas-por-componente)
@@ -77,7 +77,7 @@ script y el Makefile también son propios. Se compila con la cadena GNU
 ├── readme.md            Este archivo
 ├── USO_DE_IA.md         Declaración detallada del uso de IA
 └── .gitignore           Excluye los archivos generados (.o, .elf, .bin, .map)
-``` 
+```
 
 ## 2. Materiales
 
@@ -236,8 +236,8 @@ Para eliminar los archivos generados en la compilación: `make clean`.
 - **`.text`** (Flash): inicia con la tabla de vectores (`.isr_vector`), obligatoriamente
   en 0x08000000, seguida del código. `KEEP` impide que el enlazador la elimine.
 - **`.rodata`** (Flash): datos constantes y bitmaps de las fuentes.
-- **`.data`** (`> RAM AT> FLASH`): Variables con valor inicial. Residen en RAM 
-  (_sdata–_edata), pero su valor inicial se almacena en Flash (_sidata).
+- **`.data`** (`> RAM AT> FLASH`): variables con valor inicial. Residen en RAM
+  (`_sdata`–`_edata`), pero su valor inicial se almacena en Flash (`_sidata`).
 - **`.bss`** (RAM, `NOLOAD`): variables inicializadas en cero (`_sbss`–`_ebss`). No
   utiliza espacio en Flash.
 - **Pila**: arranca en `_estack` = 0x20018000 (extremo final de la RAM) y crece hacia
@@ -290,7 +290,7 @@ MUSIC/
 ## 8. Pruebas por componente
 
 Antes de integrar el reproductor, cada parte del hardware se probó por separado con un
-programa propio. Están en `pruebas/`, numerados en el orden en que se hicieron. Cada uno
+programa independiente. Están en `pruebas/`, numerados en el orden en que se hicieron. Cada uno
 es **independiente**: tiene su propio `Makefile`, `crt0.S` y linker script, y funciona con
 el reloj interno de 16 MHz (HSI), sin depender de los drivers del proyecto.
 
@@ -301,29 +301,31 @@ cd pruebas/01_pines       # o la prueba que se quiera
 make
 make flash
 ```
-| Prueba                 | Qué comprueba                        | Si funciona                            |
-| ---------------------- | ------------------------------------ | -------------------------------------- |
-| `01_pines`             | Cableado de la pantalla, sin SPI     | Cada pin marca 3,3 V durante 2 s       |
-| `02_pantalla_parlante` | ST7789 en modo 0 (8 MHz) y audio PWM | Colores en pantalla y tonos 440–880 Hz |
-| `03_pantalla_modo3`    | ST7789 en modo 3 (1 MHz) y audio PWM | Igual que la 02 (esta sí funcionó)     |
-| `04_sd`                | Inicio de la SD, sector 0 y FAT32    | Verde; si falla, roja y LED parpadea   |
-| `05_sd_uart`           | Lo mismo que la 04, por UART         | Respuestas de cada comando (115200)    |
-| `06_audio_flash`       | PWM (TIM2) + TIM3 a 22 050 Hz        | Suena un fragmento guardado en Flash   |
+
+| Prueba                 | Qué comprueba                        | Si funciona                               |
+| ---------------------- | ------------------------------------ | ----------------------------------------- |
+| `01_pines`             | Cableado de la pantalla, sin SPI     | Cada pin marca 3,3 V durante 2 s          |
+| `02_pantalla_parlante` | ST7789 en modo 0 (8 MHz) y audio PWM | Colores en pantalla y tonos 440–880 Hz    |
+| `03_pantalla_modo3`    | ST7789 en modo 3 (1 MHz) y audio PWM | Igual que la 02 (esta sí funcionó)        |
+| `04_sd`                | Inicio de la SD, sector 0 y FAT32    | No funcionó: se quedó en azul (ver notas) |
+| `05_sd_uart`           | Lo mismo que la 04, por UART         | No funcionó (ver notas)                   |
+| `06_audio_flash`       | PWM (TIM2) + TIM3 a 22 050 Hz        | Suena un fragmento guardado en Flash      |
 
 **Notas:**
 
 - **`01_pines`** pone en alto cada pin de la pantalla (CS, SCK, SDA, DC, RST) durante 2 s,
   uno por uno, para medirlo con el multímetro.
 - **`02` y `03`** muestran rojo, verde, azul y blanco, y tocan 440, 660 y 880 Hz.
-- **`04_sd`**: si falla, el LED parpadea N veces, donde N es el paso que falló.
-**Notas:**
-
-- **`04_sd` y `05_sd_uart` usan el cableado de la primera versión:** la SD en PB3 (SCK),
-  PB4 (MISO) y PB5 (MOSI). Con estas pruebas se encontró que PB3 es también la salida SWO
-  de depuración y causaba fallas, por lo que en el proyecto final la SD se movió a
-  PA5–PA7. Para usarlas, conectar la SD en esos pines.
 - **`02` frente a `03`:** la pantalla no funcionó en modo SPI 0; la versión en modo 3
   (CPOL = 1, CPHA = 1) sí, y ese es el modo que usa el driver del proyecto.
+- **`04_sd` y `05_sd_uart` no funcionaron:** la 04 se quedaba en la pantalla azul de
+  "cargando" (la SD nunca terminaba de iniciar; si falla en un paso, el LED parpadea N
+  veces, donde N es ese paso). Para saber si el problema era el módulo y la tarjeta o el
+  STM32, se probaron con un Arduino usando el ejemplo de la librería SD de Arduino, y ahí
+  sí leyó: el fallo estaba del lado del STM32. En el proyecto final se corrigió moviendo la
+  SD de PB3–PB5 a PA5–PA7 (PB3 es la salida SWO), subiendo la velocidad de los pines del
+  SPI1 y agregando la ventana de voltaje en ACMD41. Estas dos pruebas usan el cableado
+  viejo: PB3 (SCK), PB4 (MISO) y PB5 (MOSI).
 - **`06_audio_flash`** no usa la microSD: el fragmento está en `src/cancion.c`. Para
   cambiarlo: `python wav_a_c.py CANCION.WAV [inicio_s] [duracion_s]` (máximo ~18 s).
 - **Herramienta en el PC:** `pruebas/herramientas/revisar_wavs.py` revisa que los WAV
@@ -334,21 +336,22 @@ En el proyecto final, el driver de la SD (`sd.c`) imprime por UART la respuesta 
 comando de inicio (CMD0, CMD8, ACMD41, CMD58), lo que sirve como modo de prueba del
 driver propio.
 
-## 9. Problemas comunes 
+## 9. Problemas comunes
 
-| Síntoma                        | Causa                          | Solución                                       |
-| ------------------------------ | ------------------------------ | ---------------------------------------------- |
-| `make flash` → `open failed`   | ST-Link no conectado a WSL     | `usbipd attach --wsl --busid 1-2`              |
-| `Device is not shared`         | Falta el `bind`                | `usbipd bind --busid 1-2` (administrador)      |
-| CMD0 no responde `01` (UART)   | Cableado de la SD o PB3 usado  | Revisar PA5–PA7 y PB6; no usar PB3 (SWO)       |
-| Colores invertidos en pantalla | Inversión activa en la ST7789  | `tft_init` envía INVOFF (0x20)                 |
-| Sale `CANCxx` y no el nombre   | No encontró `NOMBRES.TXT`      | Debe estar en `MUSIC/EPIC/`                    |
-| Audio saturado                 | Ganancia alta del amplificador | Bajar el potenciómetro o subir `VOLUMEN_SHIFT` |
+| Síntoma                        | Causa                            | Solución                                        |
+| ------------------------------ | -------------------------------- | ----------------------------------------------- |
+| `make flash` → `open failed`   | ST-Link no conectado a WSL       | `usbipd attach --wsl --busid 1-2`               |
+| `Device is not shared`         | Falta el `bind`                  | `usbipd bind --busid 1-2` (administrador)       |
+| CMD0 no responde `01` (UART)   | Cableado de la SD o PB3 usado    | Revisar PA5–PA7 y PB6; no usar PB3 (SWO)        |
+| La SD falla o lee mal bytes    | Pines del SPI1 en velocidad baja | Configurarlos en velocidad muy alta (`spi.c`)   |
+| Colores invertidos en pantalla | Inversión activa en la ST7789    | `tft_init` envía INVOFF (0x20)                  |
+| Sale `CANCxx` y no el nombre   | No encontró `NOMBRES.TXT`        | Debe estar en `MUSIC/EPIC/`                     |
+| Audio saturado                 | Ganancia alta del amplificador   | Bajar el potenciómetro o subir `VOLUMEN_SHIFT`  |
 
 ## 10. Librerías externas y créditos
 
-Todos los drivers de periféricos del microcontrolador son propios. Las únicas partes
-externas son:
+Los drivers de periféricos se escribieron para este proyecto (con apoyo de IA, ver
+[USO_DE_IA.md](USO_DE_IA.md)). Las únicas librerías externas son:
 
 - **FatFs** de ChaN (elm-chan) — `source/` (excepto `diskio.c`). Licencia propia tipo BSD.
   <http://elm-chan.org/fsw/ff/>

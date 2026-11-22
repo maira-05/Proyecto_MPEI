@@ -1,3 +1,19 @@
+/*
+ * Uso de IA (Claude) en este archivo. Detalle en USO_DE_IA.md.
+ *
+ * La logica del reproductor (estados, cinco botones, menu y boton de encendido) la
+ * definimos nosotros.
+ *
+ * Estructura con ??? y pistas de Claude, completado y probado por nosotros:
+ *   - Conversacion 1: doble buffer (variables y rellenado en el main), interrupcion de
+ *     TIM3, botones (flanco de bajada y antirrebote), buscar_data, iniciar_cancion,
+ *     estados (Pausa, Stop, Siguiente, Anterior) y boton de encendido.
+ *   - Conversacion 2: cargar_nombres, funciones del menu (abrir_menu, salir_menu,
+ *     boton_en_menu) y arranque en el menu.
+ *
+ * Entregado completo por Claude: filtro pasa-altos y volumen dentro de la interrupcion
+ * (FILTRO_K, VOLUMEN_SHIFT); los valores los elegimos nosotros.
+ */
 #include <stdint.h>
 #include "stm32f4xx.h"
 #include "gpio.h"
@@ -6,7 +22,7 @@
 #include "uart.h"
 #include "ff.h"
 #include "audio.h"
-#include "pantalla.h"     
+#include "pantalla.h"
 
 #define TAM_BUFFER     4096   // bytes por buffer (~93 ms de audio)
 #define NUM_CANCIONES  40     // CANC01 ... CANC40

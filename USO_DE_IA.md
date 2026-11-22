@@ -5,10 +5,10 @@ fin, qué partes del código tuvieron su ayuda y cómo se verificó el resultado
 
 ## 1. Herramientas
 
-| Herramienta | Uso |
-|---|---|
-| **Claude** (Anthropic), en dos conversaciones | Apoyo en diseño, código, depuración, comentarios, diagramas y documentación |
-| **OpenCode** | Descarga de las canciones y conversión al formato del reproductor (WAV mono, 22 050 Hz, 16 bits) |
+| Herramienta                        | Uso                                                                                              |
+|----------------------------------- |------------------------------------------------------------------------------------------------- |
+| **Claude** en dos conversaciones   | Apoyo en diseño, código, depuración, comentarios, diagramas y documentación                      |
+| **OpenCode**                       | Descarga de las canciones y conversión al formato del reproductor (WAV mono, 22 050 Hz, 16 bits) |
 
 Conversaciones con Claude:
 1. **"Proyecto MPEI reproductor de música"**: base del reproductor (arranque, linker,
@@ -21,24 +21,26 @@ Conversaciones con Claude:
 ### 2.1 Base del reproductor (conversación 1)
 
 Nosotros definimos la lógica del reproductor: el diagrama de flujo inicial, los cinco
-botones, el menú y el botón de encendido. La ayuda de la IA se dio de tres maneras:
+botones, el menú y el botón de encendido. La ayuda de la IA se dio de cuatro maneras:
 
 | Modalidad | Archivos |
-|---|---|
+|-------------------------------------------------------------------------- |---|
 | **Generado por la IA** (revisado, compilado y probado por nosotros)       | `linker_script.ld`, `crt0.S` |
-| **Estructura con `???` y pistas** (nosotros completamos y probamos)       | `audio.c`, `diskio.c`, partes de `main.c` |
-| **Escrito por nosotros con asesoría** (la IA señalaba errores y su causa) | `system.c`, `gpio.c`, `uart.c`, `spi.c`, `sd.c`, `tft.c`, `Makefile` |
+| **Estructura con `???` y pistas** (nosotros completamos y probamos)       | `audio.c`, partes de `main.c` |
+| **Escrito por nosotros con asesoría** (la IA señalaba errores y su causa) | `system.c`, `gpio.c`, `uart.c`, `spi.c`, `sd.c`, `tft.c` |
+| **Hecho por nosotros, revisado con la IA** (la IA confirmó que estaba bien) | `diskio.c`, `Makefile` |
 
 Detalles:
 - `crt0.S` se adaptó del startup de ST, con `SystemInit` y `_init` débiles.
-- `diskio.c` se hizo sobre la plantilla de FatFs.
+- `diskio.c` lo adaptamos a partir de la plantilla y los comentarios de FatFs.
+- El `Makefile` lo hicimos a partir de los ejemplos del profesor.
 - En `main.c`, las partes con `???` fueron el doble buffer, la interrupción de TIM3,
   `buscar_data`, `iniciar_cancion`, los botones (flanco y antirrebote), los estados y el
   botón de encendido.
 
-La IA entregó completas dos líneas de `main.c`: el volumen por software (`VOLUMEN_SHIFT`)
-y el filtro pasa-altos digital (`FILTRO_K`). Los valores finales los elegimos nosotros
-al escuchar el resultado.
+La IA entregó completos, en la interrupción de `main.c`, el volumen por software
+(`VOLUMEN_SHIFT`) y el filtro pasa-altos digital (`FILTRO_K`). Los valores finales los
+elegimos nosotros al escuchar el resultado.
 
 También nos orientó en la depuración del hardware, indicando qué medir y probar:
 el conflicto de PB3 (SWO) con el SPI, el apagón al alimentar el amplificador desde la
@@ -52,7 +54,9 @@ La microSD fallaba al leer (se notó al integrar el amplificador). Con ayuda de 
   a velocidad muy alta.
 - El argumento de ACMD41 se completó con la ventana de voltaje (2,7–3,6 V, `0x00FF8000`),
   sin la cual esta tarjeta no terminaba de inicializarse.
+
 Nosotros probamos el arreglo en el montaje completo.
+
 ### 2.2 Programas de prueba (`pruebas/`)
 
 La IA entregó completos los programas de prueba de hardware (`01_pines` a
@@ -60,7 +64,8 @@ La IA entregó completos los programas de prueba de hardware (`01_pines` a
 componente por separado (pines, pantalla, parlante, microSD, UART y audio) antes de
 integrarlo al reproductor.
 
-[COMPLETAR: confirmar que todos salieron de la conversación 1 y si se modificaron.]
+`04_sd` y `05_sd_uart` no lograron iniciar la SD. El módulo y la tarjeta se verificaron
+con un Arduino usando el ejemplo de la librería SD de Arduino (no generado por IA).
 
 ### 2.3 Pantalla, texto y menú (conversación 2)
 
@@ -130,3 +135,16 @@ OpenCode se usó solo para descargar las canciones y convertirlas a WAV mono, 22
 - Las explicaciones de la IA se contrastaron con el manual de referencia (RM0368), la hoja
   de datos de la ST7789, la especificación de la SD en modo SPI y la documentación de FatFs.
 
+## 4. Cómo se marca en el código
+
+Cada archivo con ayuda de IA tiene al inicio un comentario que indica la modalidad:
+
+```c
+/* IA: generado por Claude; revisado, compilado y probado por nosotros. */
+/* IA: estructura con ??? y pistas de Claude; completado y probado por nosotros. */
+/* IA: escrito por nosotros con asesoría de Claude (correcciones puntuales). */
+/* IA: hecho por nosotros; revisado y confirmado con Claude. */
+```
+
+Las partes puntuales dentro de un archivo (por ejemplo, el filtro pasa-altos en `main.c`)
+llevan además un comentario `// IA:` en la línea donde empiezan.

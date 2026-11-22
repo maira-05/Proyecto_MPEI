@@ -1,3 +1,6 @@
+# IA: escrito por nosotros a partir de los ejemplos del profesor;
+# revisado y confirmado con Claude.
+
 APPNAME = main
 
 #Variables de las herramientas de compilación

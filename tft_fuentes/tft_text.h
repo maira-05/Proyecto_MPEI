@@ -1,3 +1,5 @@
+/* IA: estructura con ??? y pistas de Claude; completado, comentado y probado por nosotros. */
+
 #ifndef __TFT_TEXT_H__          // Evita redefiniciones si dos archivos incluyen este .h 
 #define __TFT_TEXT_H__
 #include <stdint.h>

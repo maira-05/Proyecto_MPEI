@@ -1,3 +1,5 @@
+/* IA: escrito por nosotros con asesoría de Claude (correcciones puntuales). */
+
 #include "gpio.h"
 
 //Habilito todos los relojes de GPIO para que respondan los puertos y podamos escribir en los registros 

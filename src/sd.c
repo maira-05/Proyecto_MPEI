@@ -1,3 +1,5 @@
+/* IA: escrito por nosotros con asesoría de Claude (correcciones puntuales). */
+
 #include "sd.h"
 #include "spi.h"
 #include "gpio.h"

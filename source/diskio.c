@@ -1,3 +1,6 @@
+/* IA: adaptado por nosotros a partir de la plantilla y los comentarios de FatFs;
+   la adaptación fue revisada y confirmada con Claude. */
+
 /*-----------------------------------------------------------------------*/
 /* Low level disk I/O module SKELETON for FatFs     (C)ChaN, 2025        */
 /*-----------------------------------------------------------------------*/

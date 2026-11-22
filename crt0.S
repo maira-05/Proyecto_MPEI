@@ -1,3 +1,5 @@
+/* IA: generado por Claude (adaptado del startup de ST); revisado, compilado y probado por nosotros. */
+
 /* =====================================================================
  * crt0.S - Codigo de arranque (startup) - Reproductor WAV (MPEI 2026)
  * Microcontrolador: STM32F401RET6 (NUCLEO-F401RE)

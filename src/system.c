@@ -1,3 +1,5 @@
+/* IA: escrito por nosotros con asesoría de Claude (correcciones puntuales). */
+
 #include "system.h"
 #include "stm32f4xx.h"
 

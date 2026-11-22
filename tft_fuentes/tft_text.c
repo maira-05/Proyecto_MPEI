@@ -1,3 +1,5 @@
+/* IA: estructura con ??? y pistas de Claude; completado, comentado y probado por nosotros. */
+
 #include "tft_text.h"
 #include "tft.h"
 

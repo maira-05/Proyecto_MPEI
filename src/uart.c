@@ -1,3 +1,5 @@
+/* IA: escrito por nosotros con asesoría de Claude (correcciones puntuales). */
+
 #include "uart.h"
 #include "gpio.h"
 #include "stm32f4xx.h"

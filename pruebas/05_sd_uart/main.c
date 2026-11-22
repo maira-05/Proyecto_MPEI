@@ -1,40 +1,14 @@
-/* =====================================================================
- * PRUEBA DE HARDWARE: modulo microSD (SPI1) + pantalla (SPI2)
- * NUCLEO-F401RE - registros directos con CMSIS, sin librerias.
+/*
+ * Prueba 05: igual que la 04, pero muestra por UART (115200 baudios) la respuesta de cada
+ * comando de inicio de la microSD.
  *
- * OJO: solo verifica que la tarjeta y el modulo responden. NO lee el
- * sistema de archivos ni reproduce canciones: eso es el nucleo del
- * proyecto y lo escriben ustedes.
+ * IA: generado por Claude; compilado y probado por nosotros.
  *
- * Que hace:
- *   1. Inicializa la tarjeta en modo SPI (CMD0, CMD8, ACMD41, CMD58).
- *   2. Lee el sector 0 (CMD17) y revisa la firma 0x55AA.
- *   3. Revisa que la tarjeta este formateada en FAT32.
+ * RESULTADO: NO FUNCIONO. La SD tampoco terminaba de iniciar. Ver el comentario de
+ * pruebas/04_sd/main.c: causa, verificacion con Arduino y correcciones del proyecto final.
  *
- * Resultado en la pantalla:
- *   VERDE -> todo bien (tarjeta inicializada, sector 0 leido, FAT32)
- *   ROJO  -> algo fallo. El LED LD2 parpadea N veces (pausa) N veces...
- *            N = paso que fallo (ver tabla de codigos abajo)
- *   AZUL (al inicio) -> esta probando
- *
- * Codigos de error (parpadeos del LED):
- *   1 = CMD0 sin respuesta    -> cableado, alimentacion o tarjeta no insertada
- *   2 = CMD8 respuesta rara   -> tarjeta muy vieja (SD v1) o ruido
- *   3 = ACMD41 timeout        -> la tarjeta no termina de iniciar
- *   4 = CMD58 fallo
- *   5 = CMD17 no entrego datos (lectura del sector 0)
- *   6 = sector 0 sin firma 0x55AA -> tarjeta sin formato
- *   7 = no es FAT32           -> formatear en FAT32
- *
- * Conexiones:
- *   Modulo microSD (SIG0104):          Pantalla (igual que antes):
- *     VCC  -> 5V                         SCK -> PB13   SDA -> PB15
- *     GND  -> GND                        CS  -> PB12   DC  -> PB14
- *     SCK  -> PB3  (D3)                  RST -> PB1
- *     MISO -> PB4  (D5)                  VCC -> 3.3V   GND -> GND
- *     MOSI -> PB5  (D4)
- *     CS   -> PB6  (D10)
- * ===================================================================== */
+ * Usa el cableado viejo: SCK = PB3, MISO = PB4, MOSI = PB5.
+ */
 
 #include <stdint.h>
 #include "stm32f4xx.h"

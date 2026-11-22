@@ -1,3 +1,5 @@
+/* IA: estructura con ??? y pistas de Claude; completado, comentado y probado por nosotros. */
+
 // funciones que maneja la pantalla, se llaman desde el main 
 #include "pantalla.h"
 #include "tft.h"
