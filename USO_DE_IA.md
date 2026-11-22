@@ -60,7 +60,7 @@ Nosotros probamos el arreglo en el montaje completo.
 ### 2.2 Programas de prueba (`pruebas/`)
 
 La IA entregó completos los programas de prueba de hardware (`01_pines` a
-`06_audio_flash`) y los scripts `revisar_wavs.py` y `wav_a_c.py`. Con ellos probamos cada
+`06_audio_flash`), incluido el arreglo de audio de `06_audio_flash/src/cancion.c`. Con ellos probamos cada
 componente por separado (pines, pantalla, parlante, microSD, UART y audio) antes de
 integrarlo al reproductor.
 

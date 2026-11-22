@@ -77,8 +77,7 @@ Makefile también se hicieron sin herramientas de ST (ver [USO_DE_IA.md](USO_DE_
 │   ├── 03_pantalla_modo3/   ST7789 en modo 3 y audio PWM
 │   ├── 04_sd/               Inicio de la microSD (cableado viejo, no funcionó)
 │   ├── 05_sd_uart/          Igual que la 04, por UART (no funcionó)
-│   ├── 06_audio_flash/      Audio desde la Flash (incluye wav_a_c.py)
-│   └── herramientas/        revisar_wavs.py: revisa el formato de los WAV
+│   └── 06_audio_flash/      Audio desde la Flash
 ├── sd/
 │   └── NOMBRES.TXT      Los 40 títulos, uno por línea, para copiar a la microSD
 ├── docs/                Esquemático (imagen y archivo de EasyEDA)
@@ -335,11 +334,8 @@ make flash
   SD de PB3–PB5 a PA5–PA7 (PB3 es la salida SWO), subiendo la velocidad de los pines del
   SPI1 y agregando la ventana de voltaje en ACMD41. Estas dos pruebas usan el cableado
   viejo: PB3 (SCK), PB4 (MISO) y PB5 (MOSI).
-- **`06_audio_flash`** no usa la microSD: el fragmento está en `src/cancion.c`. Para
-  cambiarlo: `python wav_a_c.py CANCION.WAV [inicio_s] [duracion_s]` (máximo ~18 s).
-- **Herramienta en el PC:** `pruebas/herramientas/revisar_wavs.py` revisa que los WAV
-  de la microSD tengan el formato correcto (PCM, 16 bits, mono, 22 050 Hz, nombre 8.3):
-  `python revisar_wavs.py E:\` (Windows) o `python revisar_wavs.py /media/sd` (Linux).
+- **`06_audio_flash`** no usa la microSD: un fragmento de canción ya convertido a un
+  arreglo de C está en `src/cancion.c` y se guarda en la Flash.
 
 En el proyecto final, el driver de la SD (`sd.c`) imprime por UART la respuesta a cada
 comando de inicio (CMD0, CMD8, ACMD41, CMD58), lo que sirve como modo de prueba del
