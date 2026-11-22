@@ -1,0 +1,132 @@
+# Uso de inteligencia artificial
+
+Este documento explica qué herramientas de IA se emplearon en el proyecto, con qué
+fin, qué partes del código tuvieron su ayuda y cómo se verificó el resultado.
+
+## 1. Herramientas
+
+| Herramienta | Uso |
+|---|---|
+| **Claude** (Anthropic), en dos conversaciones | Apoyo en diseño, código, depuración, comentarios, diagramas y documentación |
+| **OpenCode** | Descarga de las canciones y conversión al formato del reproductor (WAV mono, 22 050 Hz, 16 bits) |
+
+Conversaciones con Claude:
+1. **"Proyecto MPEI reproductor de música"**: base del reproductor (arranque, linker,
+   drivers, microSD, FatFs, audio, doble buffer, botones y estados), depuración del
+   hardware, revisión de comentarios de los drivers, diagramas y parte del informe.
+2. **Pantalla y documentación**: fuentes, interfaz, menú, comentarios, README y repositorio.
+
+## 2. Qué se hizo con IA
+
+### 2.1 Base del reproductor (conversación 1)
+
+Nosotros definimos la lógica del reproductor: el diagrama de flujo inicial, los cinco
+botones, el menú y el botón de encendido. La ayuda de la IA se dio de tres maneras:
+
+| Modalidad | Archivos |
+|---|---|
+| **Generado por la IA** (revisado, compilado y probado por nosotros)       | `linker_script.ld`, `crt0.S` |
+| **Estructura con `???` y pistas** (nosotros completamos y probamos)       | `audio.c`, `diskio.c`, partes de `main.c` |
+| **Escrito por nosotros con asesoría** (la IA señalaba errores y su causa) | `system.c`, `gpio.c`, `uart.c`, `spi.c`, `sd.c`, `tft.c`, `Makefile` |
+
+Detalles:
+- `crt0.S` se adaptó del startup de ST, con `SystemInit` y `_init` débiles.
+- `diskio.c` se hizo sobre la plantilla de FatFs.
+- En `main.c`, las partes con `???` fueron el doble buffer, la interrupción de TIM3,
+  `buscar_data`, `iniciar_cancion`, los botones (flanco y antirrebote), los estados y el
+  botón de encendido.
+
+La IA entregó completas dos líneas de `main.c`: el volumen por software (`VOLUMEN_SHIFT`)
+y el filtro pasa-altos digital (`FILTRO_K`). Los valores finales los elegimos nosotros
+al escuchar el resultado.
+
+También nos orientó en la depuración del hardware, indicando qué medir y probar:
+el conflicto de PB3 (SWO) con el SPI, el apagón al alimentar el amplificador desde la
+Nucleo, la salida en puente del GF1002, la saturación del audio y los problemas de
+tierra y contacto. Las mediciones, el recableado y las pruebas fueron nuestros.
+
+La microSD fallaba al leer (se notó al integrar el amplificador). Con ayuda de la IA
+(conversación 1) se encontraron dos causas, corregidas en `proyecto_fix_sd`:
+- Los pines del SPI1 estaban en velocidad baja (`OSPEEDR`): los flancos eran demasiado
+  lentos para los 5,25 MHz del SPI y se leía mal el último bit de cada byte. Se cambiaron
+  a velocidad muy alta.
+- El argumento de ACMD41 se completó con la ventana de voltaje (2,7–3,6 V, `0x00FF8000`),
+  sin la cual esta tarjeta no terminaba de inicializarse.
+Nosotros probamos el arreglo en el montaje completo.
+### 2.2 Programas de prueba (`pruebas/`)
+
+La IA entregó completos los programas de prueba de hardware (`01_pines` a
+`06_audio_flash`) y los scripts `revisar_wavs.py` y `wav_a_c.py`. Con ellos probamos cada
+componente por separado (pines, pantalla, parlante, microSD, UART y audio) antes de
+integrarlo al reproductor.
+
+[COMPLETAR: confirmar que todos salieron de la conversación 1 y si se modificaron.]
+
+### 2.3 Pantalla, texto y menú (conversación 2)
+
+La IA no entregó estos archivos completos. El proceso fue:
+
+1. Explicaba el concepto (ventana de la ST7789 con CASET, RASET y RAMWR; colores RGB565;
+   formato GFXfont; cómo ubicar el bit de cada píxel de una letra).
+2. Entregaba el código con `???` y pistas en las partes clave.
+3. Nosotros completábamos, compilábamos y probábamos en la placa.
+4. La IA revisaba lo completado y explicaba los errores.
+
+| Archivo | Contenido |
+|---|---|
+| `src/tft.c`, `inc/tft.h` | `tft_ventana`, `tft_pixel`, `tft_rectangulo`, `tft_llenar` y colores |
+| `tft_fuentes/tft_text.c/.h` | Dibujo de letras y texto con GFXfont, texto centrado |
+| `src/pantalla.c`, `inc/pantalla.h` | Pantalla de reproducción, división del nombre en líneas y menú con desplazamiento |
+| `main.c` (menú y nombres) | `cargar_nombres`, `abrir_menu`, `salir_menu`, `boton_en_menu` y arranque en el menú |
+
+Otros aportes de esta conversación:
+- **Prueba de fuentes**: programa completo entregado por la IA solo para verificar las
+  fuentes; no quedó en el repositorio.
+- **SPI2**: la IA sugirió subir la velocidad a 10,5 MHz (prescaler /4) para que el
+  dibujo no interfiriera con la reproducción.
+- **`NOMBRES.TXT`**: la IA armó la lista de los 40 títulos y nosotros confirmamos el orden.
+
+### 2.4 Comentarios del código
+
+- **Drivers** (`system.c`, `gpio.c`, `uart.c`, `spi.c`, `sd.c`, `diskio.c`, `audio.c`,
+  `tft.c`): los escribimos nosotros. En la conversación 1 la IA los revisó uno por uno,
+  marcó los incorrectos o incompletos y sugirió textos (casi completos en `uart.c`,
+  frases sueltas en el resto), que adaptamos.
+- **`pantalla.c` y `pantalla.h`**: los escribimos nosotros. La IA marcaba con `???` los
+  que faltaban, daba pistas y luego revisaba lo escrito.
+- **`main.c`**: los del menú (`abrir_menu`, `salir_menu`, `boton_en_menu`) son nuestros.
+  En la revisión final la IA señaló los poco claros o vacíos y propuso el texto de los
+  faltantes (interrupción de TIM3, `buscar_data`, `detener_audio`, `volatile`, botón azul
+  y estados). Revisamos cada uno antes de aceptarlo. El código no cambió, solo los comentarios.
+
+### 2.5 Documentación
+
+- **README.md**: el contenido es nuestro (materiales, conexiones, valores del filtro,
+  alimentación, pines, uso y problemas encontrados). La IA propuso la estructura de
+  secciones y corrigió errores. Para las partes técnicas (compilación y grabación, uso de
+  memoria, linker script y tabla de pruebas) dio un borrador con nuestros datos, que
+  reescribimos con nuestras palabras.
+- **Diagramas del informe** (conversación 1): la IA explicó qué diagramas hacer y cómo
+  organizarlos, y dio el pseudocódigo del `main` y un diagrama de flujo de referencia.
+  Los diagramas finales (arquitectura por capas, esquemático y flujo del `main`) los
+  hicimos nosotros y la IA los revisó.
+- **Informe** (conversación 1): la IA explicó el diagrama de flujo por etapas y redactó
+  una versión corregida de la sección "Lógica del reproductor", que adaptamos.
+- **Git**: la IA nos guió para resolver un conflicto de merge, configurar el `.gitignore`
+  y separar el proyecto en este repositorio conservando los commits de los dos integrantes.
+
+### 2.6 Canciones (OpenCode)
+
+OpenCode se usó solo para descargar las canciones y convertirlas a WAV mono, 22 050 Hz,
+16 bits. No generó código del firmware.
+
+## 3. Cómo se verificó el código generado
+
+- Todo se compiló y probó en la Nucleo-F401RE con el montaje real.
+- Cada componente (programas de `pruebas/`) y cada función de la pantalla se probó por
+  separado antes de integrarse.
+- Se midió el tiempo de dibujo con la música sonando para comprobar que el doble buffer
+  no se quedara sin datos.
+- Las explicaciones de la IA se contrastaron con el manual de referencia (RM0368), la hoja
+  de datos de la ST7789, la especificación de la SD en modo SPI y la documentación de FatFs.
+
