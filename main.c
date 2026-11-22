@@ -1,18 +1,11 @@
 /*
- * Uso de IA (Claude) en este archivo. Detalle en USO_DE_IA.md.
- *
- * La logica del reproductor (estados, cinco botones, menu y boton de encendido) la
- * definimos nosotros.
- *
- * Estructura con ??? y pistas de Claude, completado y probado por nosotros:
- *   - Conversacion 1: doble buffer (variables y rellenado en el main), interrupcion de
- *     TIM3, botones (flanco de bajada y antirrebote), buscar_data, iniciar_cancion,
- *     estados (Pausa, Stop, Siguiente, Anterior) y boton de encendido.
- *   - Conversacion 2: cargar_nombres, funciones del menu (abrir_menu, salir_menu,
- *     boton_en_menu) y arranque en el menu.
- *
+ * IA (Claude): logica definida por nosotros. Doble buffer, interrupcion, botones, estados
+ * y menu hechos con estructura ??? y pistas de Claude, completados por nosotros. 
+ * 
  * Entregado completo por Claude: filtro pasa-altos y volumen dentro de la interrupcion
- * (FILTRO_K, VOLUMEN_SHIFT); los valores los elegimos nosotros.
+ * (FILTRO_K, VOLUMEN_SHIFT); los valores los elegimos nosotros. 
+ * 
+ * Detalle en USO_DE_IA.md.
  */
 #include <stdint.h>
 #include "stm32f4xx.h"
