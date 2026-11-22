@@ -40,7 +40,15 @@ script y el Makefile también son propios. Se compila con la cadena GNU
 ├── crt0.S               Arranque: tabla de vectores, copia .data, limpia .bss, llama a main
 ├── linker_script.ld     Mapa de memoria: Flash 512 KB en 0x08000000, RAM 96 KB en 0x20000000
 ├── Makefile             Compilación con arm-none-eabi-gcc y grabación con OpenOCD
-├── inc/                 Encabezados propios (gpio.h, spi.h, sd.h, tft.h, audio.h, ...)
+├── inc/                 Encabezados propios (uno por cada driver de src/)
+│   ├── system.h         delay_ms y arranque del reloj
+│   ├── gpio.h           Estructura GPIO_InitTypeDef, modos y pull-up/pull-down
+│   ├── uart.h           uart_init, uart_enviar_texto, uart_numero
+│   ├── spi.h            Inicio y transferencia de SPI1 y SPI2
+│   ├── sd.h             Inicio de la microSD y lectura de sectores
+│   ├── audio.h          audio_pwm_init, audio_muestreo_init, audio_poner_muestra
+│   ├── tft.h            Funciones de la ST7789, pines, tamaño y colores RGB565
+│   ├── pantalla.h       pantalla_inicio, pantalla_cancion, pantalla_estado, menú
 │   └── cmsis/           Encabezados CMSIS (nombres de los registros del STM32F401)
 ├── src/                 Drivers propios
 │   ├── system.c         Reloj a 84 MHz y delay_ms
@@ -52,16 +60,24 @@ script y el Makefile también son propios. Se compila con la cadena GNU
 │   ├── tft.c            Driver de la ST7789: inicio, ventana, píxel, rectángulo
 │   └── pantalla.c       Interfaz: pantalla de reproducción y menú
 ├── source/              FatFs (elm-chan) — sistema de archivos FAT32
+│   ├── ff.c / ff.h      Núcleo de FatFs (f_mount, f_open, f_read, f_gets...)
+│   ├── ffconf.h         Configuración de FatFs (FF_USE_STRFUNC = 1 para f_gets)
+│   ├── ffsystem.c       Funciones de sistema de FatFs
+│   ├── ffunicode.c      Tablas de caracteres de FatFs
+│   ├── diskio.h         Interfaz que FatFs espera del disco
 │   └── diskio.c         Puente entre FatFs y sd.c (escrito por nosotros)
 ├── tft_fuentes/         Dibujo de texto
 │   ├── tft_text.c/.h    Dibuja letras con fuentes en formato GFXfont (propio)
 │   ├── gfxfont.h        Estructuras de las fuentes
 │   ├── Adafruit_GFX.h   Archivo puente para usar las fuentes sin Arduino
-│   └── Fonts/           Fuentes de Adafruit GFX (FreeSansBold 9/12/18 pt)
+│   └── Fonts/           Fuentes de Adafruit GFX (FreeSansBold 9/12/18 pt, DigitalWF 24 pt)
+├── pruebas/             Programas de prueba por módulo (ver sección 8)
 ├── sd/                  NOMBRES.TXT de ejemplo para copiar a la microSD
-├── docs/                Informe en PDF, esquemático, diagramas y fotos
-└── USO_DE_IA.md         Declaración detallada del uso de IA
-```
+├── docs/                Esquemático (imagen y archivo de EasyEDA)
+├── readme.md            Este archivo
+├── USO_DE_IA.md         Declaración detallada del uso de IA
+└── .gitignore           Excluye los archivos generados (.o, .elf, .bin, .map)
+``` 
 
 ## 2. Materiales
 
@@ -162,72 +178,74 @@ openocd --version
    ```
 5. En WSL, comprobar que aparece: `lsusb` → `STMicroelectronics ST-LINK/V2.1`.
 
-## 5. Compilar y grabar
+## 5. Compilación y programación de la placa
 
-### Requisitos
-- `arm-none-eabi-gcc` (toolchain ARM)
+### Herramientas necesarias
+- `arm-none-eabi-gcc` (cadena de herramientas para ARM)
 - `make`
 - `openocd`
-- En WSL: `usbipd-win` para pasar el ST-Link a Linux
+- Si usas WSL, también `usbipd-win`, que permite exponer el ST-Link a Linux
 
-### Clonar y compilar
+### Obtener el código y compilarlo
 ```bash
 git clone https://github.com/maira-05/Proyecto_MPEI.git
 cd Proyecto_MPEI
 make
 ```
 
-### Grabar en la Nucleo
-En WSL, primero conectar el ST-Link desde PowerShell (como administrador):
+### Programar la Nucleo
+Con WSL, antes que nada hay que vincular el ST-Link desde PowerShell abierto como administrador:
 ```powershell
 usbipd list
 usbipd bind --busid <BUSID>      # solo la primera vez
 usbipd attach --wsl --busid <BUSID>
 ```
-Luego, en WSL:
+Después, desde WSL:
 ```bash
 make flash
 ```
-Para borrar los archivos generados: `make clean`.
+Para eliminar los archivos generados en la compilación: `make clean`.
 
-### Qué hace el Makefile
-- Compila todos los `.c` de la carpeta principal, `src/`, `source/` y `tft_fuentes/`,
-  y el `crt0.S`, con `-mcpu=cortex-m4 -std=c11 -ffreestanding -Og -g`.
-- Busca encabezados en `inc/`, `inc/cmsis/`, `source/` y `tft_fuentes/`.
-- Enlaza con `linker_script.ld` y `-nostdlib`, agregando solo `libc` y `libgcc`.
-- Al terminar, muestra el tamaño de cada sección con `arm-none-eabi-size`.
-- `make flash` usa OpenOCD con `interface/stlink.cfg` y `target/stm32f4x.cfg`.
+### Funcionamiento del Makefile
+- Compila todos los `.c` ubicados en la carpeta raíz, `src/`, `source/` y `tft_fuentes/`,
+  además de `crt0.S`, usando las opciones `-mcpu=cortex-m4 -std=c11 -ffreestanding -Og -g`.
+- Los encabezados se buscan en `inc/`, `inc/cmsis/`, `source/` y `tft_fuentes/`.
+- El enlazado usa `linker_script.ld` y `-nostdlib`, incorporando únicamente `libc` y `libgcc`.
+- Al finalizar, `arm-none-eabi-size` imprime el tamaño de cada sección.
+- `make flash` invoca OpenOCD con `interface/stlink.cfg` y `target/stm32f4x.cfg`.
 
-### Uso de memoria
+### Consumo de memoria
 | Región                                | Usado    | Total   | %      |
 |-------------------------------------- |--------- |-------- |------- |
 | Flash (`.text` + `.rodata` + `.data`) | 22 924 B | 512 KiB | 4,4 %  |
 | RAM (`.data` + `.bss`)                | 10 932 B | 96 KiB  | 11,1 % |
 
-- La mayor parte de la RAM es el doble buffer de audio (2 × 4096 B).
-- La mayor parte de `.rodata` son los bitmaps de las fuentes.
-- `.data` ocupa espacio en los dos lados: su valor inicial se guarda en Flash
-  y `crt0.S` lo copia a RAM al arrancar.
+- Gran parte de la RAM la consume el doble buffer de audio (2 × 4096 B).
+- Casi todo `.rodata` corresponde a los bitmaps de las fuentes.
+- `.data` se cuenta en ambas memorias: su valor inicial reside en Flash y
+  `crt0.S` lo copia a RAM durante el arranque.
 
-### Qué hace el linker script
-`linker_script.ld` define las dos memorias del STM32F401RE y dónde va cada sección:
+### Función del linker script
+`linker_script.ld` describe las dos memorias del STM32F401RE y la ubicación de cada sección:
 
 | Región | Inicio     | Tamaño  |
 |------- |------------|---------|
 | FLASH  | 0x08000000 | 512 KiB |
 | RAM    | 0x20000000 | 96 KiB  |
 
-- **`.text`** (Flash): primero la tabla de vectores (`.isr_vector`), que debe quedar en
-  0x08000000, y luego el código. `KEEP` evita que el enlazador la descarte.
-- **`.rodata`** (Flash): constantes y bitmaps de las fuentes.
-- **`.data`** (`> RAM AT> FLASH`): variables con valor inicial. Viven en RAM
-  (`_sdata`–`_edata`), pero su valor inicial se guarda en Flash (`_sidata`).
-- **`.bss`** (RAM, `NOLOAD`): variables en cero (`_sbss`–`_ebss`). No ocupa Flash.
-- **Pila**: empieza en `_estack` = 0x20018000 (final de la RAM) y crece hacia abajo.
-  Un `ASSERT` hace fallar el enlace si quedan menos de 2 KiB libres para ella.
+- **`.text`** (Flash): inicia con la tabla de vectores (`.isr_vector`), obligatoriamente
+  en 0x08000000, seguida del código. `KEEP` impide que el enlazador la elimine.
+- **`.rodata`** (Flash): datos constantes y bitmaps de las fuentes.
+- **`.data`** (`> RAM AT> FLASH`): Variables con valor inicial. Residen en RAM 
+  (_sdata–_edata), pero su valor inicial se almacena en Flash (_sidata).
+- **`.bss`** (RAM, `NOLOAD`): variables inicializadas en cero (`_sbss`–`_ebss`). No
+  utiliza espacio en Flash.
+- **Pila**: arranca en `_estack` = 0x20018000 (extremo final de la RAM) y crece hacia
+  abajo. Un `ASSERT` detiene el enlazado si le quedan menos de 2 KiB disponibles.
 
-Al arrancar, `crt0.S` usa estos símbolos para copiar `.data` de Flash a RAM,
-poner `.bss` en cero y luego llamar a `main()`.
+Durante el arranque, `crt0.S` se apoya en estos símbolos para copiar `.data` de Flash
+a RAM, poner `.bss` en cero y, por último, llamar a `main()`.
+
 ## 6. Preparar la microSD
 
 1. Formatear la microSD en **FAT32**.
