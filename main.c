@@ -6,7 +6,7 @@
 #include "uart.h"
 #include "ff.h"
 #include "audio.h"
-#include "pantalla.h"     // interfaz: que se muestra en la pantalla
+#include "pantalla.h"     
 
 #define TAM_BUFFER     4096   // bytes por buffer (~93 ms de audio)
 #define NUM_CANCIONES  40     // CANC01 ... CANC40
@@ -17,29 +17,31 @@
 #define BTN_NEXT   12       // PC12
 #define BTN_PREV   8        // PC8
 #define BTN_MENU   6        // PC6
+#define BTN_POWER 13        // PC13: boton azul de la Nucleo
 #define NUM_BOTONES 5
-#define BTN_POWER 13        //Boton azul de la nucleo y la que encendera todo (azul=encendido, blanco=apagado)
- 
-//Estados del reproductor 
-#define DETENIDO      0 //para el boton de stop
-#define REPRODUCIENDO 1
-#define PAUSADO       2 //para el boton de pausa
 
-//Volumen y filtro pasa-altos para las canciones
-#define VOLUMEN_SHIFT 1 // para reducir el volumen, desplazar a la derecha los valores de las muestras
-#define FILTRO_K 5 //pasa-altosfc ~ 22050 / (2*pi*2^K) -> K=5 = ~110 Hz
+// Estados del reproductor
+#define DETENIDO      0     // archivo WAV cerrado: al seguir, empieza desde el inicio
+#define REPRODUCIENDO 1     // archivo abierto y TIM3 sacando audio
+#define PAUSADO       2     // archivo abierto pero TIM3 apagado: al seguir, continua donde quedo
 
-static FATFS fs;            // libreria de sistema de archivos
-static FIL   archivo;       // archivo WAV abierto actualmente
+// Volumen y filtro pasa-altos para las canciones
+#define VOLUMEN_SHIFT 1     // para reducir el volumen, dividiendo cada muestra entre 2^VOLUMEN_SHIFT
+#define FILTRO_K 5          // pasa-altos: fc ~ 22050 / (2*pi*2^K) -> K=5 = ~110 Hz
+
+static FATFS fs;            // datos de la SD montada (como esta organizada); lo llena f_mount
+static FIL   archivo;       // datos del WAV abierto (posicion de lectura)
 
 // ===== Doble buffer =====
+// volatile: la interrupcion y el main cambian estas variables, el compilador
+// no puede guardarlas en un registro y debe leerlas de la RAM cada vez
 static uint8_t buffer[2][TAM_BUFFER];       // [0] y [1] son los dos buffers de audio
 static volatile uint8_t  lleno[2];          // 1 = lleno, 0 = vacio
-static volatile uint8_t  activo = 0;
-static volatile uint32_t pos = 0;
+static volatile uint8_t  activo = 0;        // buffer que esta sonando (0 o 1)
+static volatile uint32_t pos = 0;           // byte actual dentro del buffer activo
 
-static uint8_t estado  = DETENIDO;
-static uint8_t cancion = 1;           // numero de la cancion actual (1..40)
+static uint8_t estado  = DETENIDO;          // DETENIDO, PAUSADO, REPRODUCIENDO
+static uint8_t cancion = 1;                 // numero de la cancion actual (1..40)
 
 // ===== Nombres de las canciones (se leen de NOMBRES.TXT al arrancar) =====
 static char nombres[NUM_CANCIONES][40];   // 40 nombres de hasta 39 letras + '\0' (1600 bytes de RAM)
@@ -54,23 +56,25 @@ static uint8_t sonaba    = 0;   // 1 = estaba sonando cuando se abrio el menu
 static const uint8_t pines_botones[NUM_BOTONES] = {BTN_PAUSE, BTN_STOP, BTN_NEXT, BTN_PREV, BTN_MENU};
 static uint8_t anterior[NUM_BOTONES] = {1, 1, 1, 1, 1};   // 1 = suelto
 
-//¿El reproductor arranca?
-static uint8_t encendido = 0;        // 0 = apagado, 1 = encendido
-static uint8_t anterior_power = 1;   // 1 = suelto, 0 = presionado
+// ===== Encendido con el boton azul =====
+static uint8_t encendido = 0;           // 0 = apagado, 1 = encendido
+static uint8_t anterior_power = 1;      // 1 = suelto, 0 = presionado
 
-void TIM3_IRQHandler(void)      // Interrupcion TIM3 se activa cada 1/22050 s (cada muestra)
+void TIM3_IRQHandler(void)              // Interrupcion TIM3 se activa cada 1/22050 s (cada muestra)
 {
-    if (TIM3->SR & TIM_SR_UIF)  
+    if (TIM3->SR & TIM_SR_UIF)          // fue la interrupcion de actualizacion (UIF)?
     {
-        TIM3->SR &= ~TIM_SR_UIF;
+        TIM3->SR &= ~TIM_SR_UIF;        // bajar la bandera; si no, la interrupcion se repite sin parar
 
-        if (!lleno[activo])
+        if (!lleno[activo])             // el main no alcanzo a llenar este buffer
         {
-            audio_poner_muestra(128);
+            audio_poner_muestra(128);   // sacar silencio mientras tanto
             return;
         }
 
+        // Unir 2 bytes (little-endian) en una muestra de 16 bits con signo
         int16_t muestra = (int16_t)(buffer[activo][pos] | (buffer[activo][pos + 1] << 8));
+
         // Filtro pasa-altos: quita los graves muy bajos que el parlante no puede reproducir
         static int32_t lento = 0;                   // promedio lento de la senal (= los graves)
         lento += (muestra - lento) >> FILTRO_K;     // se acerca poco a poco a la senal
@@ -78,14 +82,17 @@ void TIM3_IRQHandler(void)      // Interrupcion TIM3 se activa cada 1/22050 s (c
         if (y >  32767) y =  32767;                 // no pasarse del rango de 16 bits
         if (y < -32768) y = -32768;
         muestra = (int16_t)y;
-        muestra =muestra >> VOLUMEN_SHIFT;
-        audio_poner_muestra((uint8_t)((muestra + 32768) >> 8));
-        pos += 2;
 
+        muestra = muestra >> VOLUMEN_SHIFT;         // bajar el volumen
+        // Pasar de -32768..32767 a 0..255 para el PWM (128 = silencio)
+        audio_poner_muestra((uint8_t)((muestra + 32768) >> 8));
+        pos += 2;                                   // siguiente muestra (2 bytes)
+
+        // Buffer terminado: marcarlo vacio para que el main lo rellene y pasar al otro
         if (pos >= TAM_BUFFER)
         {
             lleno[activo] = 0;
-            activo ^= 1;
+            activo ^= 1;                            // 0 -> 1 o 1 -> 0
             pos = 0;
         }
     }
@@ -96,7 +103,8 @@ static void botones_init(void)
 {
     for (int i = 0; i < NUM_BOTONES; i++)
     {
-        GPIO_InitTypeDef b = {GPIO_MODO_ENTRADA, pines_botones[i], GPIO_PULL_UP, GPIO_BAJA_VELOCIDAD, 0};   // 
+        // Entrada con pull-up interno: suelto = 1, presionado = 0 (el boton va a GND)
+        GPIO_InitTypeDef b = {GPIO_MODO_ENTRADA, pines_botones[i], GPIO_PULL_UP, GPIO_BAJA_VELOCIDAD, 0};
         GPIO_Config(GPIOC, b);
     }
 }
@@ -108,7 +116,7 @@ static int boton_presionado(void)
     for (int i = 0; i < NUM_BOTONES; i++)
     {
         uint8_t actual = leer_pin_state(GPIOC, pines_botones[i]);
-        if (anterior[i] == 1 && actual == 0 && presionado == -1)    //  flanco de bajada: suelto -> presionado 
+        if (anterior[i] == 1 && actual == 0 && presionado == -1)    // flanco de bajada: suelto -> presionado
             presionado = i;
         anterior[i] = actual;
     }
@@ -119,23 +127,25 @@ static int boton_presionado(void)
 // ===== Silencio y detener la interrupcion =====
 static void detener_audio(void)
 {
-    TIM3->CR1 &= ~TIM_CR1_CEN;                // apagar el contador del TIM3 
-    audio_poner_muestra(128);                 
+    TIM3->CR1 &= ~TIM_CR1_CEN;                // apagar el contador del TIM3 (no mas interrupciones)
+    audio_poner_muestra(128);                 // dejar el PWM en silencio
 }
 
-// ===== Buscar el chunk "data" (es SU codigo del main, movido a una funcion) =====
+// ===== Saltar la cabecera del WAV hasta el chunk "data" (donde empiezan las muestras) =====
 static uint8_t buscar_data(void)    // devuelve 1 si lo encontro
 {
     uint8_t cab[12];
     UINT leidos;
-    f_read(&archivo, cab, 12, &leidos);
+    f_read(&archivo, cab, 12, &leidos);         // saltar "RIFF", tamano y "WAVE"
     while (1)
     {
+        // Cada chunk empieza con 8 bytes: 4 de nombre ("fmt ", "data"...) y 4 de tamano
         uint8_t trozo[8];
         f_read(&archivo, trozo, 8, &leidos);
-        if (leidos < 8) return 0;
+        if (leidos < 8) return 0;               // se acabo el archivo sin encontrar "data"
         uint32_t tam = trozo[4] | (trozo[5] << 8) | (trozo[6] << 16) | ((uint32_t)trozo[7] << 24);
         if (trozo[0] == 'd' && trozo[1] == 'a' && trozo[2] == 't' && trozo[3] == 'a') return 1;
+        // No es "data": saltar el chunk entero (si el tamano es impar hay 1 byte de relleno)
         f_lseek(&archivo, f_tell(&archivo) + tam + (tam & 1));
     }
 }
@@ -149,8 +159,8 @@ static uint8_t iniciar_cancion(uint8_t numero)   // devuelve 0 si arranco bien
 
     // 3. Armar el nombre: "/MUSIC/EPIC/CANCxx.WAV"
     char nombre[] = "/MUSIC/EPIC/CANC00.WAV";
-    nombre[16] = '0' + (numero / 10);         // nombre[16] es para el numero de la cancion 0 - 4
-    nombre[17] = '0' + (numero % 10);         // nombre[17] es el segundo numero de la cancion del 0 - 9
+    nombre[16] = '0' + (numero / 10);         // decena del numero (0..4)
+    nombre[17] = '0' + (numero % 10);         // unidad del numero (0..9)
     uart_enviar_texto("Abriendo "); uart_enviar_texto(nombre); uart_enviar_texto("\r\n");
 
     // 4. Abrir y buscar el audio
@@ -161,8 +171,8 @@ static uint8_t iniciar_cancion(uint8_t numero)   // devuelve 0 si arranco bien
     UINT leidos;
     f_read(&archivo, buffer[0], TAM_BUFFER, &leidos);  lleno[0] = 1;
     f_read(&archivo, buffer[1], TAM_BUFFER, &leidos);  lleno[1] = 1;
-    activo = 0;                                 // desde que cancion empieza 00 en este caso (buffer)
-    pos    = 0;
+    activo = 0;     // la interrupcion empieza por el buffer 0
+    pos    = 0;     // desde el primer byte
 
     // 6. Arrancar
     audio_muestreo_init(22050);
@@ -212,8 +222,8 @@ static void cargar_nombres(void)
 }
 
 // ===== Siguiente y anterior, dando la vuelta (40 -> 1 y 1 -> 40) =====
-static uint8_t siguiente(uint8_t n) { return (n >= NUM_CANCIONES) ? 1 : n + 1; }      // 
-static uint8_t previa(uint8_t n)    { return (n <= 1) ? NUM_CANCIONES : n - 1; }      // 
+static uint8_t siguiente(uint8_t n) { return (n >= NUM_CANCIONES) ? 1 : n + 1; }   // 40 -> 1
+static uint8_t previa(uint8_t n)    { return (n <= 1) ? NUM_CANCIONES : n - 1; }   // 1 -> 40
 
 // ===== Abrir el menu: pausa la musica y dibuja la lista =====
 static void abrir_menu(void)
@@ -221,11 +231,11 @@ static void abrir_menu(void)
     sonaba = (estado == REPRODUCIENDO); // guarda si la musica estaba reproduciendose antes de darle a menu
     if (sonaba)
     {
-        detener_audio();                
-        estado = PAUSADO;               // actaliza el estado a pausado mientras se esta en el menu
+        detener_audio();
+        estado = PAUSADO;               // actualiza el estado a pausado mientras se esta en el menu
     }
     en_menu   = 1;
-    seleccion = cancion;                // selecciona que cancion que se estaba reproduciendo para que aparezca en el menu 
+    seleccion = cancion;                // selecciona que cancion que se estaba reproduciendo para que aparezca en el menu
     pantalla_menu_abrir(nombres, seleccion);    // llama al menu para que muestre los nombre y lo marcado
     uart_enviar_texto("Menu\r\n");
 }
@@ -234,9 +244,9 @@ static void abrir_menu(void)
 static void salir_menu(void)
 {
     en_menu = 0;                                        // menu apagado
-    pantalla_inicio();                                 
+    pantalla_inicio();                                  // redibujar lo fijo (fondo, barras, titulo)
     pantalla_cancion(cancion, nombres[cancion - 1]);    // con la misma cancion de antes
-    if (sonaba)                                         // si la cancion esta reproduciendo, antes de abrir el menu
+    if (sonaba)                                         // si la cancion estaba sonando antes de abrir el menu
     {
         TIM3->CR1 |= TIM_CR1_CEN;                       // encender el timer del audio
         estado = REPRODUCIENDO;                         // actualiza al estado para que retome desde donde se entro al menu
@@ -265,7 +275,7 @@ static void boton_en_menu(int boton)
     {
         en_menu = 0;                                        // se sale del menu
         cancion = seleccion;                                // la cancion actual se actualiza a la seleccionada
-        pantalla_inicio();                                  // redibujar la pantalla de reproduccion  
+        pantalla_inicio();                                  // redibujar la pantalla de reproduccion
         iniciar_cancion(cancion);                           // complementa lo anterior en base a lo seleccionado
     }
     else if (boton == 4 || boton == 1)                      // MENU o STOP: salir sin cambiar
@@ -284,8 +294,9 @@ int main(void)
 
     botones_init();
     audio_pwm_init();            // PA0 queda en silencio (128) desde el arranque
-    
-    GPIO_InitTypeDef power = {GPIO_MODO_ENTRADA, BTN_POWER, GPIO_SIN_PULL, GPIO_BAJA_VELOCIDAD, 0};   
+
+    // Boton azul: sin pull interno, la Nucleo ya trae una resistencia de pull-up en PC13
+    GPIO_InitTypeDef power = {GPIO_MODO_ENTRADA, BTN_POWER, GPIO_SIN_PULL, GPIO_BAJA_VELOCIDAD, 0};
     GPIO_Config(GPIOC, power);
 
     FRESULT fr = f_mount(&fs, "", 1);
@@ -301,27 +312,27 @@ int main(void)
             {
                 detener_audio();
                 f_close(&archivo);
-                estado = DETENIDO;                                            
-                en_menu = 0;                                               // si se apaga con el menu abierto, se cierra
+                estado = DETENIDO;
+                en_menu = 0;                                              // si se apaga con el menu abierto, se cierra
                 tft_apagar();
                 encendido = 0;
                 uart_enviar_texto("Apagado\r\n");
             }
-            else                                                            // estaba apagado -> ENCENDER
+            else                                                          // estaba apagado -> ENCENDER
             {
                 tft_encender();
-                pantalla_inicio();                                          // dibujar lo fijo (fondo, barras, titulo) ANTES de la cancion
+                pantalla_inicio();                                        // dibujar lo fijo (fondo, barras, titulo) ANTES de la cancion
                 encendido = 1;
                 uart_enviar_texto("Encendido\r\n");
-                abrir_menu();                                               // inicia en menu 
+                abrir_menu();                                             // inicia en menu
             }
-            delay_ms(50);                                                   // antirrebote
+            delay_ms(50);                                                 // antirrebote
         }
         anterior_power = power_actual;
 
-        if (!encendido) continue;                                           // si esta apagado, no hacer nada mas
-        // ===== 1. Rellenar buffers (SIEMPRE, mientras suena) =====
+        if (!encendido) continue;                                         // si esta apagado, no hacer nada mas
 
+        // ===== 1. Rellenar buffers (siempre, mientras suena) =====
         if (estado == REPRODUCIENDO)
         {
             for (int b = 0; b < 2; b++)
@@ -330,21 +341,21 @@ int main(void)
                 {
                     UINT leidos;
                     f_read(&archivo, buffer[b], TAM_BUFFER, &leidos);
-                    if (leidos == 0)                                          // se acabo la cancion
+                    if (leidos == 0)                                      // se acabo la cancion
                     {
                         uart_enviar_texto("Fin de la cancion\r\n");
-                        cancion = siguiente(cancion);                         // pasar a la siguiente
+                        cancion = siguiente(cancion);                     // pasar a la siguiente
                         iniciar_cancion(cancion);
                         break;
                     }
                     // El ultimo pedazo casi nunca llena los 4096: el resto se llena con silencio
-                    for (UINT i = leidos; i < TAM_BUFFER; i++) buffer[b][i] = 0;   
+                    for (UINT i = leidos; i < TAM_BUFFER; i++) buffer[b][i] = 0;
                     lleno[b] = 1;
                 }
             }
         }
 
-        // ===== 2. Botones (su cadena if / else if) =====
+        // ===== 2. Botones =====
         int boton = boton_presionado();
         if (boton == -1) continue;                        // ningun boton: volver a rellenar buffers
 
@@ -379,18 +390,18 @@ int main(void)
         {
             detener_audio();
             f_close(&archivo);
-            estado = DETENIDO;                                                  
+            estado = DETENIDO;
             uart_enviar_texto("Stop\r\n");
-            pantalla_estado("Stop");         
+            pantalla_estado("Stop");
         }
         else if (boton == 2)                              // NEXT
         {
-            cancion = siguiente(cancion);                                                 
+            cancion = siguiente(cancion);
             iniciar_cancion(cancion);
         }
         else if (boton == 3)                              // PREV
         {
-            cancion = previa(cancion);                                                 
+            cancion = previa(cancion);
             iniciar_cancion(cancion);
         }
         else if (boton == 4)                              // MENU
