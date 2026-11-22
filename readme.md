@@ -65,18 +65,26 @@ Makefile también se hicieron sin herramientas de ST (ver [USO_DE_IA.md](USO_DE_
 │   ├── ffsystem.c       Funciones de sistema de FatFs
 │   ├── ffunicode.c      Tablas de caracteres de FatFs
 │   ├── diskio.h         Interfaz que FatFs espera del disco
-│   └── diskio.c         Puente entre FatFs y sd.c (escrito por nosotros)
+│   └── diskio.c         Puente entre FatFs y sd.c (adaptado por nosotros de la plantilla de FatFs)
 ├── tft_fuentes/         Dibujo de texto
 │   ├── tft_text.c/.h    Dibuja letras con fuentes en formato GFXfont (propio)
 │   ├── gfxfont.h        Estructuras de las fuentes
 │   ├── Adafruit_GFX.h   Archivo puente para usar las fuentes sin Arduino
 │   └── Fonts/           Fuentes de Adafruit GFX (FreeSansBold 9/12/18 pt, DigitalWF 24 pt)
-├── pruebas/             Programas de prueba por módulo (ver sección 8)
-├── sd/                  NOMBRES.TXT de ejemplo para copiar a la microSD
+├── pruebas/             Programas de prueba por módulo, independientes (ver sección 8)
+│   ├── 01_pines/            Cableado de la pantalla, sin SPI
+│   ├── 02_pantalla_parlante/ ST7789 en modo 0 y audio PWM
+│   ├── 03_pantalla_modo3/   ST7789 en modo 3 y audio PWM
+│   ├── 04_sd/               Inicio de la microSD (cableado viejo, no funcionó)
+│   ├── 05_sd_uart/          Igual que la 04, por UART (no funcionó)
+│   ├── 06_audio_flash/      Audio desde la Flash (incluye wav_a_c.py)
+│   └── herramientas/        revisar_wavs.py: revisa el formato de los WAV
+├── sd/
+│   └── NOMBRES.TXT      Los 40 títulos, uno por línea, para copiar a la microSD
 ├── docs/                Esquemático (imagen y archivo de EasyEDA)
 ├── readme.md            Este archivo
 ├── USO_DE_IA.md         Declaración detallada del uso de IA
-└── .gitignore           Excluye los archivos generados (.o, .elf, .bin, .map)
+└── .gitignore           Excluye archivos generados al compilar, audio y archivos del sistema
 ```
 
 ## 2. Materiales
@@ -256,9 +264,10 @@ a RAM, poner `.bss` en cero y, por último, llamar a `main()`.
    ffmpeg -i "cancion original.mp3" -ac 1 -ar 22050 -c:a pcm_s16le CANC01.WAV
    ```
    (`-ac 1` = mono, `-ar 22050` = frecuencia de muestreo, `pcm_s16le` = 16 bits con signo).
-4. Copiar `NOMBRES.TXT` a la misma carpeta: **una línea por canción, en el mismo orden**
-   que los archivos (línea 1 = CANC01). Solo caracteres ASCII, sin tildes ni ñ (la fuente
-   no las tiene). Si el archivo no está, la pantalla muestra `CANC01`, `CANC02`...
+4. Copiar `sd/NOMBRES.TXT` (incluido en este repositorio) a la misma carpeta: **una línea
+   por canción, en el mismo orden** que los archivos (línea 1 = CANC01). Solo caracteres
+   ASCII, sin tildes ni ñ (la fuente no las tiene). Si el archivo no está, la pantalla
+   muestra `CANC01`, `CANC02`...
 
 Estructura final de la SD:
 
@@ -338,15 +347,15 @@ driver propio.
 
 ## 9. Problemas comunes
 
-| Síntoma                        | Causa                            | Solución                                        |
-| ------------------------------ | -------------------------------- | ----------------------------------------------- |
-| `make flash` → `open failed`   | ST-Link no conectado a WSL       | `usbipd attach --wsl --busid 1-2`               |
-| `Device is not shared`         | Falta el `bind`                  | `usbipd bind --busid 1-2` (administrador)       |
-| CMD0 no responde `01` (UART)   | Cableado de la SD o PB3 usado    | Revisar PA5–PA7 y PB6; no usar PB3 (SWO)        |
-| La SD falla o lee mal bytes    | Pines del SPI1 en velocidad baja | Configurarlos en velocidad muy alta (`spi.c`)   |
-| Colores invertidos en pantalla | Inversión activa en la ST7789    | `tft_init` envía INVOFF (0x20)                  |
-| Sale `CANCxx` y no el nombre   | No encontró `NOMBRES.TXT`        | Debe estar en `MUSIC/EPIC/`                     |
-| Audio saturado                 | Ganancia alta del amplificador   | Bajar el potenciómetro o subir `VOLUMEN_SHIFT`  |
+| Síntoma                        | Causa                          | Solución                                       |
+| ------------------------------ | ------------------------------ | ---------------------------------------------- |
+| `make flash` → `open failed`   | ST-Link no conectado a WSL     | `usbipd attach --wsl --busid 1-2`              |
+| `Device is not shared`         | Falta el `bind`                | `usbipd bind --busid 1-2` (administrador)      |
+| CMD0 no responde `01` (UART)   | Cableado de la SD o PB3 usado  | Revisar PA5–PA7 y PB6; no usar PB3 (SWO)       |
+| La SD falla o lee mal bytes    | Pines del SPI1 en velocidad baja | Configurarlos en velocidad muy alta (`spi.c`) |
+| Colores invertidos en pantalla | Inversión activa en la ST7789  | `tft_init` envía INVOFF (0x20)                 |
+| Sale `CANCxx` y no el nombre   | No encontró `NOMBRES.TXT`      | Debe estar en `MUSIC/EPIC/`                    |
+| Audio saturado                 | Ganancia alta del amplificador | Bajar el potenciómetro o subir `VOLUMEN_SHIFT` |
 
 ## 10. Librerías externas y créditos
 

@@ -1,3 +1,7 @@
+/* IA: inicialización escrita por nosotros con asesoría de Claude; tft_ventana, tft_pixel,
+   tft_rectangulo y tft_llenar con estructura ??? y pistas de Claude, completadas por nosotros. 
+*/
+
 #ifndef __TFT_H__
 #define __TFT_H__
 #include <stdint.h>

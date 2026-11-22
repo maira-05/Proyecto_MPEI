@@ -1,3 +1,6 @@
+/* IA: inicialización escrita por nosotros con asesoría de Claude; tft_ventana, tft_pixel,
+   tft_rectangulo y tft_llenar con estructura ??? y pistas de Claude, completadas por nosotros. */
+
 #include "tft.h"
 #include "gpio.h"
 #include "spi.h"
