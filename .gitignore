@@ -1,0 +1,26 @@
+# ===== Archivos generados al compilar =====
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.img
+*.map
+*.lst
+
+# ===== Windows / WSL =====
+*Zone.Identifier
+Thumbs.db
+desktop.ini
+
+# ===== Mac =====
+.DS_Store
+
+# ===== Python (scripts de pruebas/) =====
+__pycache__/
+*.pyc
+
+# ===== Audio: las canciones van en la microSD, no en el repo =====
+*.wav
+*.WAV
+*.mp3
