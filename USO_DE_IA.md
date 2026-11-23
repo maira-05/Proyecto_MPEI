@@ -71,7 +71,7 @@ con un Arduino usando el ejemplo de la librería SD de Arduino (no generado por 
 
 La IA no entregó estos archivos completos. El proceso fue:
 
-1. Explicaba el concepto (ventana de la ST7789 con CASET, RASET y RAMWR; colores RGB565;
+1.4 Explicaba el concepto (ventana de la ST7789 con CASET, RASET y RAMWR; colores RGB565;
    formato GFXfont; cómo ubicar el bit de cada píxel de una letra).
 2. Entregaba el código con `???` y pistas en las partes clave.
 3. Nosotros completábamos, compilábamos y probábamos en la placa.

@@ -80,11 +80,12 @@ Makefile también se hicieron sin herramientas de ST (ver [USO_DE_IA.md](USO_DE_
 │   ├── 06_audio_flash/      Audio desde la Flash
 │   └── 07_fuentes/          Fuentes de Adafruit GFX en la pantalla
 ├── sd/
-│   └── NOMBRES.TXT      Los 40 títulos, uno por línea, para copiar a la microSD
-├── docs/                Esquemático (imagen y archivo de EasyEDA)
-├── readme.md            Este archivo
-├── USO_DE_IA.md         Declaración detallada del uso de IA
-└── .gitignore           Excluye archivos generados al compilar, audio y archivos del sistema
+│   └── NOMBRES.TXT         Los 40 títulos, uno por línea, para copiar a la microSD
+├── Informe_Proyecto_MPEI   Informe del proyecto en formato IEEE
+├── docs/                   Esquemático (imagen y archivo de EasyEDA)
+├── readme.md               Este archivo
+├── USO_DE_IA.md            Declaración detallada del uso de IA
+└── .gitignore              Excluye archivos generados al compilar, audio y archivos del sistema
 ```
 
 ## 2. Materiales
