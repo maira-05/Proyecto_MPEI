@@ -1,0 +1,12 @@
+PRUEBA DE FUENTES (ST7789 240x320)
+
+Desde la carpeta pruebas/07_fuentes/:
+    make
+    make flash
+
+La pantalla muestra 4 paginas que cambian cada 4 s:
+colores, fuentes Sans, otras fuentes y un ejemplo del reproductor.
+
+- Usa ../../src/system.c, gpio.c, spi.c y tft.c SIN modificarlos.
+- No compila main.c, la SD, el audio ni FatFs.
+- Los .o quedan en build/ (no se mezclan con los del proyecto).

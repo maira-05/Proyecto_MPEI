@@ -5,10 +5,10 @@ fin, qué partes del código tuvieron su ayuda y cómo se verificó el resultado
 
 ## 1. Herramientas
 
-| Herramienta                        | Uso                                                                                              |
-|----------------------------------- |------------------------------------------------------------------------------------------------- |
-| **Claude** en dos conversaciones   | Apoyo en diseño, código, depuración, comentarios, diagramas y documentación                      |
-| **OpenCode**                       | Descarga de las canciones y conversión al formato del reproductor (WAV mono, 22 050 Hz, 16 bits) |
+| Herramienta                        | Uso                                                                                  |
+|----------------------------------- |------------------------------------------------------------------------------------- |
+| **Claude** en dos conversaciones   | Apoyo en diseño, código, depuración, comentarios, diagramas y documentación          |
+| **OpenCode**                       | Descarga de las canciones en WAV y diagnóstico del problema de lectura de la microSD |
 
 Conversaciones con Claude:
 1. **"Proyecto MPEI reproductor de música"**: base del reproductor (arranque, linker,
@@ -23,12 +23,12 @@ Conversaciones con Claude:
 Nosotros definimos la lógica del reproductor: el diagrama de flujo inicial, los cinco
 botones, el menú y el botón de encendido. La ayuda de la IA se dio de cuatro maneras:
 
-| Modalidad | Archivos |
-|-------------------------------------------------------------------------- |---|
-| **Generado por la IA** (revisado, compilado y probado por nosotros)       | `linker_script.ld`, `crt0.S` |
-| **Estructura con `???` y pistas** (nosotros completamos y probamos)       | `audio.c`, partes de `main.c` |
-| **Escrito por nosotros con asesoría** (la IA señalaba errores y su causa) | `system.c`, `gpio.c`, `uart.c`, `spi.c`, `sd.c`, `tft.c` |
-| **Hecho por nosotros, revisado con la IA** (la IA confirmó que estaba bien) | `diskio.c`, `Makefile` |
+| Modalidad                                                                   | Archivos                                                  |
+|---------------------------------------------------------------------------- |---------------------------------------------------------- |
+| **Generado por la IA** (revisado, compilado y probado por nosotros)         | `linker_script.ld`, `crt0.S`                              |
+| **Estructura con `???` y pistas** (nosotros completamos y probamos)         | `audio.c`, partes de `main.c`                             |
+| **Escrito por nosotros con asesoría** (la IA señalaba errores y su causa)   | `system.c`, `gpio.c`, `uart.c`, `spi.c`, `sd.c`, `tft.c`  |
+| **Hecho por nosotros, revisado con la IA** (la IA confirmó que estaba bien) | `diskio.c`, `Makefile`                                    |
 
 Detalles:
 - `crt0.S` se adaptó del startup de ST, con `SystemInit` y `_init` débiles.
@@ -38,7 +38,7 @@ Detalles:
   `buscar_data`, `iniciar_cancion`, los botones (flanco y antirrebote), los estados y el
   botón de encendido.
 
-La IA entregó completos, en la interrupción de `main.c`, el volumen por software
+La IA entregó completos, dentro de `main.c`, el volumen por software
 (`VOLUMEN_SHIFT`) y el filtro pasa-altos digital (`FILTRO_K`). Los valores finales los
 elegimos nosotros al escuchar el resultado.
 
@@ -48,7 +48,7 @@ Nucleo, la salida en puente del GF1002, la saturación del audio y los problemas
 tierra y contacto. Las mediciones, el recableado y las pruebas fueron nuestros.
 
 La microSD fallaba al leer (se notó al integrar el amplificador). Con ayuda de la IA
-(conversación 1) se encontraron dos causas, corregidas en `proyecto_fix_sd`:
+(OpenCode) se encontraron dos causas:
 - Los pines del SPI1 estaban en velocidad baja (`OSPEEDR`): los flancos eran demasiado
   lentos para los 5,25 MHz del SPI y se leía mal el último bit de cada byte. Se cambiaron
   a velocidad muy alta.
@@ -60,8 +60,8 @@ Nosotros probamos el arreglo en el montaje completo.
 ### 2.2 Programas de prueba (`pruebas/`)
 
 La IA entregó completos los programas de prueba de hardware (`01_pines` a
-`06_audio_flash`), incluido el arreglo de audio de `06_audio_flash/src/cancion.c`. Con ellos probamos cada
-componente por separado (pines, pantalla, parlante, microSD, UART y audio) antes de
+`07_fuentes`), incluido el arreglo de audio de `06_audio_flash/src/cancion.c`. Con ellos probamos cada
+componente por separado (pines, pantalla, parlante, microSD, UART, audio y fuentes) antes de
 integrarlo al reproductor.
 
 `04_sd` y `05_sd_uart` no lograron iniciar la SD. El módulo y la tarjeta se verificaron
@@ -77,16 +77,16 @@ La IA no entregó estos archivos completos. El proceso fue:
 3. Nosotros completábamos, compilábamos y probábamos en la placa.
 4. La IA revisaba lo completado y explicaba los errores.
 
-| Archivo | Contenido |
-|---|---|
-| `src/tft.c`, `inc/tft.h` | `tft_ventana`, `tft_pixel`, `tft_rectangulo`, `tft_llenar` y colores |
-| `tft_fuentes/tft_text.c/.h` | Dibujo de letras y texto con GFXfont, texto centrado |
-| `src/pantalla.c`, `inc/pantalla.h` | Pantalla de reproducción, división del nombre en líneas y menú con desplazamiento |
-| `main.c` (menú y nombres) | `cargar_nombres`, `abrir_menu`, `salir_menu`, `boton_en_menu` y arranque en el menú |
+| Archivo                             | Contenido                                                                           |
+|------------------------------------ |------------------------------------------------------------------------------------ |
+| `src/tft.c`, `inc/tft.h`            | `tft_ventana`, `tft_pixel`, `tft_rectangulo`, `tft_llenar` y colores                |
+| `tft_fuentes/tft_text.c/.h`         | Dibujo de letras y texto con GFXfont, texto centrado                                |
+| `src/pantalla.c`, `inc/pantalla.h`  | Pantalla de reproducción, división del nombre en líneas y menú con desplazamiento   |
+| `main.c` (menú y nombres)           | `cargar_nombres`, `abrir_menu`, `salir_menu`, `boton_en_menu` y arranque en el menú |
 
 Otros aportes de esta conversación:
-- **Prueba de fuentes**: programa completo entregado por la IA solo para verificar las
-  fuentes; no quedó en el repositorio.
+- **Prueba de fuentes** (`pruebas/07_fuentes`): programa completo entregado por la IA
+  para ver las fuentes en la pantalla y elegir las del reproductor.
 - **SPI2**: la IA sugirió subir la velocidad a 10,5 MHz (prescaler /4) para que el
   dibujo no interfiriera con la reproducción.
 - **`NOMBRES.TXT`**: la IA armó la lista de los 40 títulos y nosotros confirmamos el orden.
@@ -115,15 +115,17 @@ Otros aportes de esta conversación:
   organizarlos, y dio el pseudocódigo del `main` y un diagrama de flujo de referencia.
   Los diagramas finales (arquitectura por capas, esquemático y flujo del `main`) los
   hicimos nosotros y la IA los revisó.
-- **Informe** (conversación 1): la IA explicó el diagrama de flujo por etapas y redactó
-  una versión corregida de la sección "Lógica del reproductor", que adaptamos.
+- **Informe**: en la conversación 1 la IA explicó el diagrama de flujo por etapas. En la
+  conversación 2 revisó y corrigió todo el informe, reescribió la sección "Lógica del
+  reproductor" y redactó un primer borrador del resumen, la introducción, los resultados y
+  las conclusiones, que revisamos y ajustamos.
 - **Git**: la IA nos guió para resolver un conflicto de merge, configurar el `.gitignore`
   y separar el proyecto en este repositorio conservando los commits de los dos integrantes.
 
-### 2.6 Canciones (OpenCode)
+### 2.6 OpenCode
 
-OpenCode se usó solo para descargar las canciones y convertirlas a WAV mono, 22 050 Hz,
-16 bits. No generó código del firmware.
+OpenCode se usó para descargar las canciones y convertirlas a WAV mono, 22 050 Hz,
+16 bits, y para diagnosticar el fallo de lectura de la microSD (ver 2.1).
 
 ## 3. Cómo se verificó el código generado
 

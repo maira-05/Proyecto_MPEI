@@ -1,4 +1,4 @@
-/* IA: generado por Claude (adaptado del startup de ST); revisado, compilado y probado por nosotros. */
+/* IA: generado por Claude a partir del mapa de memoria del STM32F401RE; revisado, compilado y probado por nosotros. */
 
 ENTRY(Reset_Handler)
 

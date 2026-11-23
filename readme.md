@@ -77,7 +77,8 @@ Makefile también se hicieron sin herramientas de ST (ver [USO_DE_IA.md](USO_DE_
 │   ├── 03_pantalla_modo3/   ST7789 en modo 3 y audio PWM
 │   ├── 04_sd/               Inicio de la microSD (cableado viejo, no funcionó)
 │   ├── 05_sd_uart/          Igual que la 04, por UART (no funcionó)
-│   └── 06_audio_flash/      Audio desde la Flash
+│   ├── 06_audio_flash/      Audio desde la Flash
+│   └── 07_fuentes/          Fuentes de Adafruit GFX en la pantalla
 ├── sd/
 │   └── NOMBRES.TXT      Los 40 títulos, uno por línea, para copiar a la microSD
 ├── docs/                Esquemático (imagen y archivo de EasyEDA)
@@ -300,7 +301,8 @@ MUSIC/
 Antes de integrar el reproductor, cada parte del hardware se probó por separado con un
 programa independiente. Están en `pruebas/`, numerados en el orden en que se hicieron. Cada uno
 es **independiente**: tiene su propio `Makefile`, `crt0.S` y linker script, y funciona con
-el reloj interno de 16 MHz (HSI), sin depender de los drivers del proyecto.
+el reloj interno de 16 MHz (HSI), sin depender de los drivers del proyecto. La excepción es
+`07_fuentes`, que usa los drivers del proyecto (`system`, `gpio`, `spi` y `tft`) a 84 MHz.
 
 Para correr cualquiera:
 
@@ -318,6 +320,7 @@ make flash
 | `04_sd`                | Inicio de la SD, sector 0 y FAT32    | No funcionó: se quedó en azul (ver notas) |
 | `05_sd_uart`           | Lo mismo que la 04, por UART         | No funcionó (ver notas)                   |
 | `06_audio_flash`       | PWM (TIM2) + TIM3 a 22 050 Hz        | Suena un fragmento guardado en Flash      |
+| `07_fuentes`           | Fuentes de Adafruit GFX en la ST7789 | 4 páginas de colores y fuentes cada 4 s   |
 
 **Notas:**
 
@@ -336,6 +339,9 @@ make flash
   viejo: PB3 (SCK), PB4 (MISO) y PB5 (MOSI).
 - **`06_audio_flash`** no usa la microSD: un fragmento de canción ya convertido a un
   arreglo de C está en `src/cancion.c` y se guarda en la Flash.
+- **`07_fuentes`** sirvió para ver en la pantalla real varias fuentes (Sans, Mono, Serif,
+  TomThumb y DigitalWF) y elegir las del reproductor: FreeSansBold de 9, 12 y 18 pt y
+  DigitalWF de 24 pt. Usa su propia versión, la primera, de `tft_text.c`.
 
 En el proyecto final, el driver de la SD (`sd.c`) imprime por UART la respuesta a cada
 comando de inicio (CMD0, CMD8, ACMD41, CMD58), lo que sirve como modo de prueba del
